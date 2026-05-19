@@ -1575,6 +1575,121 @@ func TestProjects_AssociateDisassociateSession(t *testing.T) {
 	}
 }
 
+func TestProjects_ListSessions_Success(t *testing.T) {
+	srv, handler, ks := newTestServer(t)
+	proj, _ := ks.CreateProject("list-sess-proj")
+	other, _ := ks.CreateProject("other-proj")
+
+	ms := srv.store.(*mockStore)
+	ms.sessions = []storage.CrawlSession{
+		{ID: "sess-1", Status: "completed", ProjectID: &proj.ID},
+		{ID: "sess-2", Status: "completed", ProjectID: &proj.ID},
+		{ID: "sess-other", Status: "completed", ProjectID: &other.ID},
+	}
+
+	req := authRequest(httptest.NewRequest("GET", "/api/projects/"+proj.ID+"/sessions", nil))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp []map[string]interface{}
+	decodeJSON(t, rec, &resp)
+	if len(resp) != 2 {
+		t.Fatalf("expected 2 sessions for project, got %d", len(resp))
+	}
+	for _, s := range resp {
+		if id, _ := s["ID"].(string); id != "sess-1" && id != "sess-2" {
+			t.Errorf("unexpected session in response: %v", id)
+		}
+	}
+}
+
+func TestProjects_ListSessions_Paginated(t *testing.T) {
+	srv, handler, ks := newTestServer(t)
+	proj, _ := ks.CreateProject("paginated-proj")
+
+	ms := srv.store.(*mockStore)
+	ms.sessions = []storage.CrawlSession{
+		{ID: "sess-1", Status: "completed", ProjectID: &proj.ID},
+		{ID: "sess-2", Status: "completed", ProjectID: &proj.ID},
+	}
+
+	req := authRequest(httptest.NewRequest("GET", "/api/projects/"+proj.ID+"/sessions?limit=10&offset=0", nil))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]interface{}
+	decodeJSON(t, rec, &resp)
+	sessions, ok := resp["sessions"].([]interface{})
+	if !ok {
+		t.Fatalf("expected sessions array, got %T", resp["sessions"])
+	}
+	if len(sessions) != 2 {
+		t.Errorf("expected 2 sessions, got %d", len(sessions))
+	}
+	if total, _ := resp["total"].(float64); int(total) != 2 {
+		t.Errorf("expected total=2, got %v", resp["total"])
+	}
+}
+
+func TestProjects_ListSessions_ProjectNotFound(t *testing.T) {
+	_, handler, _ := newTestServer(t)
+
+	req := authRequest(httptest.NewRequest("GET", "/api/projects/does-not-exist/sessions", nil))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestProjects_ListSessions_ProjectKeyForbidden(t *testing.T) {
+	_, handler, ks := newTestServer(t)
+	proj, _ := ks.CreateProject("owner")
+	other, _ := ks.CreateProject("other")
+	key, _ := ks.CreateAPIKey("scoped", "project", &proj.ID)
+
+	req := httptest.NewRequest("GET", "/api/projects/"+other.ID+"/sessions", nil)
+	req.Header.Set("X-API-Key", key.FullKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestProjects_ListSessions_ProjectKeyAllowed(t *testing.T) {
+	srv, handler, ks := newTestServer(t)
+	proj, _ := ks.CreateProject("owner")
+	key, _ := ks.CreateAPIKey("scoped", "project", &proj.ID)
+
+	ms := srv.store.(*mockStore)
+	ms.sessions = []storage.CrawlSession{
+		{ID: "sess-1", Status: "completed", ProjectID: &proj.ID},
+	}
+
+	req := httptest.NewRequest("GET", "/api/projects/"+proj.ID+"/sessions", nil)
+	req.Header.Set("X-API-Key", key.FullKey)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp []map[string]interface{}
+	decodeJSON(t, rec, &resp)
+	if len(resp) != 1 {
+		t.Errorf("expected 1 session, got %d", len(resp))
+	}
+}
+
 // =========================================================================
 // 6. Compare tests
 // =========================================================================

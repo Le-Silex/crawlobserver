@@ -247,6 +247,7 @@ func (s *Server) buildHandler() (http.Handler, error) {
 	mux.HandleFunc("PUT /api/projects/{id}", s.handleRenameProject)
 	mux.HandleFunc("DELETE /api/projects/{id}", s.handleDeleteProject)
 	mux.HandleFunc("DELETE /api/projects/{id}/with-sessions", s.handleDeleteProjectWithSessions)
+	mux.HandleFunc("GET /api/projects/{id}/sessions", s.handleListProjectSessions)
 	mux.HandleFunc("POST /api/projects/{pid}/sessions/{sid}", s.handleAssociateSession)
 	mux.HandleFunc("DELETE /api/projects/{pid}/sessions/{sid}", s.handleDisassociateSession)
 	mux.HandleFunc("PUT /api/sessions/{sid}/label", s.handleRenameSession)

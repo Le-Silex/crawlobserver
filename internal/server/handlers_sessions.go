@@ -114,6 +114,76 @@ func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, resp)
 }
 
+// handleListProjectSessions lists sessions belonging to a specific project.
+// Supports pagination via ?limit= and search via ?search=. Results are sorted
+// newest first (same ordering as ListSessions).
+func (s *Server) handleListProjectSessions(w http.ResponseWriter, r *http.Request) {
+	projectID := r.PathValue("id")
+
+	// Project API keys may only access their own project.
+	auth := apikeys.FromContext(r.Context())
+	if auth != nil && auth.ProjectID != nil && *auth.ProjectID != projectID {
+		writeError(w, http.StatusForbidden, "project not accessible with this API key")
+		return
+	}
+
+	if _, err := s.keyStore.GetProject(projectID); err != nil {
+		writeError(w, http.StatusNotFound, "project not found")
+		return
+	}
+
+	if r.URL.Query().Get("limit") != "" {
+		limit, offset := clampPagination(queryInt(r, "limit", 30), queryInt(r, "offset", 0))
+		search := r.URL.Query().Get("search")
+
+		sessions, total, err := s.store.ListSessionsPaginated(r.Context(), limit, offset, projectID, search)
+		if err != nil {
+			internalError(w, r, err)
+			return
+		}
+		resp := s.enrichSessions(sessions)
+		writeJSON(w, map[string]interface{}{
+			"sessions": resp,
+			"total":    total,
+		})
+		return
+	}
+
+	sessions, err := s.store.ListSessions(r.Context(), projectID)
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+	writeJSON(w, s.enrichSessions(sessions))
+}
+
+// enrichSessions adds runtime status fields (is_running, is_queued, live page
+// count) and redacts sensitive config from the stored sessions.
+func (s *Server) enrichSessions(sessions []storage.CrawlSession) []map[string]interface{} {
+	resp := make([]map[string]interface{}, 0, len(sessions))
+	for _, sess := range sessions {
+		pagesCrawled := sess.PagesCrawled
+		if pages, _, running := s.manager.Progress(sess.ID); running {
+			pagesCrawled = uint64(pages)
+		}
+		resp = append(resp, map[string]interface{}{
+			"ID":           sess.ID,
+			"StartedAt":    sess.StartedAt,
+			"FinishedAt":   sess.FinishedAt,
+			"Status":       sess.Status,
+			"SeedURLs":     sess.SeedURLs,
+			"Config":       config.RedactSensitiveConfigJSON(sess.Config),
+			"PagesCrawled": pagesCrawled,
+			"UserAgent":    sess.UserAgent,
+			"ProjectID":    sess.ProjectID,
+			"Label":        sess.Label,
+			"is_running":   s.manager.IsRunning(sess.ID),
+			"is_queued":    s.manager.IsQueued(sess.ID),
+		})
+	}
+	return resp
+}
+
 func (s *Server) handlePages(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.PathValue("id")
 	if !s.requireSessionAccess(w, r, sessionID) {
