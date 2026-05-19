@@ -1015,6 +1015,116 @@ func TestCRUD_GetSessions(t *testing.T) {
 	}
 }
 
+func TestCRUD_GetSessionsRedactsSensitiveConfig(t *testing.T) {
+	secretConfig := config.Config{
+		Crawler: config.CrawlerConfig{
+			Workers:   7,
+			UserAgent: "SafeBot/1.0",
+			Cloudflare: config.CloudflareConfig{
+				APIKey: "cloudflare-api-key-secret",
+			},
+		},
+		Server: config.ServerConfig{
+			Username: "admin",
+			Password: "app-password-secret",
+		},
+		ClickHouse: config.ClickHouseConfig{
+			Password: "clickhouse-password-secret",
+		},
+		GSC: config.GSCConfig{
+			ClientSecret: "gsc-client-secret",
+		},
+		Interlinking: config.InterlinkingConfig{
+			Embeddings: config.EmbeddingsConfig{
+				APIKey: "embedding-api-key-secret",
+			},
+		},
+	}
+	configJSON, err := json.Marshal(secretConfig)
+	if err != nil {
+		t.Fatalf("marshaling config: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name      string
+		path      string
+		paginated bool
+	}{
+		{name: "plain", path: "/api/sessions"},
+		{name: "paginated", path: "/api/sessions?limit=10", paginated: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv, handler, _ := newTestServer(t)
+			ms := srv.store.(*mockStore)
+			ms.sessions = []storage.CrawlSession{
+				{
+					ID:        "sess-secret",
+					Status:    "completed",
+					SeedURLs:  []string{"https://example.com"},
+					StartedAt: time.Now(),
+					Config:    string(configJSON),
+				},
+			}
+
+			req := authRequest(httptest.NewRequest("GET", tc.path, nil))
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d; body: %s", rec.Code, rec.Body.String())
+			}
+
+			body := rec.Body.String()
+			for _, forbidden := range []string{
+				"app-password-secret",
+				"clickhouse-password-secret",
+				"gsc-client-secret",
+				"cloudflare-api-key-secret",
+				"embedding-api-key-secret",
+				"Password",
+				"ClientSecret",
+				"APIKey",
+			} {
+				if strings.Contains(body, forbidden) {
+					t.Fatalf("sessions response leaked %q: %s", forbidden, body)
+				}
+			}
+
+			var sessions []map[string]interface{}
+			if tc.paginated {
+				var payload struct {
+					Sessions []map[string]interface{} `json:"sessions"`
+				}
+				if err := json.Unmarshal([]byte(body), &payload); err != nil {
+					t.Fatalf("decoding paginated response: %v", err)
+				}
+				sessions = payload.Sessions
+			} else if err := json.Unmarshal([]byte(body), &sessions); err != nil {
+				t.Fatalf("decoding response: %v", err)
+			}
+			if len(sessions) != 1 {
+				t.Fatalf("expected 1 session, got %d", len(sessions))
+			}
+
+			safeConfig, ok := sessions[0]["Config"].(string)
+			if !ok {
+				t.Fatalf("Config should be a string, got %T", sessions[0]["Config"])
+			}
+			var decoded struct {
+				Crawler config.CrawlerConfig
+			}
+			if err := json.Unmarshal([]byte(safeConfig), &decoded); err != nil {
+				t.Fatalf("decoding redacted config: %v", err)
+			}
+			if decoded.Crawler.UserAgent != "SafeBot/1.0" {
+				t.Fatalf("Crawler.UserAgent = %q, want SafeBot/1.0", decoded.Crawler.UserAgent)
+			}
+			if decoded.Crawler.Workers != 7 {
+				t.Fatalf("Crawler.Workers = %d, want 7", decoded.Crawler.Workers)
+			}
+		})
+	}
+}
+
 func TestCRUD_DeleteRunningSession(t *testing.T) {
 	srv, handler, _ := newTestServer(t)
 

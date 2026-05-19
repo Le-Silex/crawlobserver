@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"time"
+
+	"github.com/SEObserver/crawlobserver/internal/config"
 )
 
 // Export JSONL record types.
@@ -147,7 +149,7 @@ func (s *Store) ExportSession(ctx context.Context, sessionID string, w io.Writer
 			FinishedAt:   sess.FinishedAt,
 			Status:       sess.Status,
 			SeedURLs:     sess.SeedURLs,
-			Config:       sess.Config,
+			Config:       config.RedactSensitiveConfigJSON(sess.Config),
 			PagesCrawled: sess.PagesCrawled,
 			UserAgent:    sess.UserAgent,
 			ProjectID:    sess.ProjectID,

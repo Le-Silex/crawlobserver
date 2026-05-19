@@ -1,7 +1,6 @@
 package crawler
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/SEObserver/crawlobserver/internal/config"
@@ -33,13 +32,13 @@ func NewSession(seeds []string, cfg *config.Config) *Session {
 
 // ToStorageRow converts a Session to a storage model.
 func (s *Session) ToStorageRow() *storage.CrawlSession {
-	configJSON, _ := json.Marshal(s.Config)
+	configJSON, _ := config.SessionConfigJSON(s.Config)
 	return &storage.CrawlSession{
 		ID:           s.ID,
 		StartedAt:    s.StartedAt,
 		Status:       s.Status,
 		SeedURLs:     s.SeedURLs,
-		Config:       string(configJSON),
+		Config:       configJSON,
 		PagesCrawled: s.Pages,
 		UserAgent:    s.Config.Crawler.UserAgent,
 		ProjectID:    s.ProjectID,

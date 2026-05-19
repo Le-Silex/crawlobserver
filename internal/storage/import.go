@@ -9,6 +9,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/SEObserver/crawlobserver/internal/config"
 	"github.com/google/uuid"
 )
 
@@ -52,7 +53,7 @@ func (s *Store) ImportSession(ctx context.Context, r io.Reader) (*CrawlSession, 
 		FinishedAt:   meta.Session.FinishedAt,
 		Status:       "imported",
 		SeedURLs:     meta.Session.SeedURLs,
-		Config:       meta.Session.Config,
+		Config:       config.RedactSensitiveConfigJSON(meta.Session.Config),
 		PagesCrawled: meta.Session.PagesCrawled,
 		UserAgent:    meta.Session.UserAgent,
 		ProjectID:    meta.Session.ProjectID,

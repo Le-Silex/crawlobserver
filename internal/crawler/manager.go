@@ -25,6 +25,12 @@ const (
 	defaultMaxPages        = 100000
 )
 
+func applySavedCrawlerConfig(cfg *config.Config, saved config.CrawlerConfig) {
+	cloudflareAPIKey := cfg.Crawler.Cloudflare.APIKey
+	cfg.Crawler = saved
+	cfg.Crawler.Cloudflare.APIKey = cloudflareAPIKey
+}
+
 // queuedCrawl holds a crawl waiting for a semaphore slot.
 type queuedCrawl struct {
 	sessionID string
@@ -366,7 +372,7 @@ func (m *Manager) ResumeCrawl(sessionID string, overrides *CrawlRequest) (string
 	if originalSession.Config != "" {
 		var savedCfg config.Config
 		if err := json.Unmarshal([]byte(originalSession.Config), &savedCfg); err == nil {
-			cfg.Crawler = savedCfg.Crawler
+			applySavedCrawlerConfig(&cfg, savedCfg.Crawler)
 		}
 	}
 	if overrides != nil {
@@ -530,7 +536,7 @@ func (m *Manager) RetryFailed(sessionID string, overrides *CrawlRequest) (int, e
 	if originalSession.Config != "" {
 		var savedCfg config.Config
 		if err := json.Unmarshal([]byte(originalSession.Config), &savedCfg); err == nil {
-			cfg.Crawler = savedCfg.Crawler
+			applySavedCrawlerConfig(&cfg, savedCfg.Crawler)
 		}
 	}
 	if overrides != nil {

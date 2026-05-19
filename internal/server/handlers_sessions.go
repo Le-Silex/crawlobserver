@@ -16,6 +16,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/SEObserver/crawlobserver/internal/apikeys"
 	"github.com/SEObserver/crawlobserver/internal/applog"
+	"github.com/SEObserver/crawlobserver/internal/config"
 	"github.com/SEObserver/crawlobserver/internal/crawler"
 	"github.com/SEObserver/crawlobserver/internal/fetcher"
 	"github.com/SEObserver/crawlobserver/internal/parser"
@@ -55,7 +56,7 @@ func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
 				"FinishedAt":   sess.FinishedAt,
 				"Status":       sess.Status,
 				"SeedURLs":     sess.SeedURLs,
-				"Config":       sess.Config,
+				"Config":       config.RedactSensitiveConfigJSON(sess.Config),
 				"PagesCrawled": pagesCrawled,
 				"UserAgent":    sess.UserAgent,
 				"ProjectID":    sess.ProjectID,
@@ -101,7 +102,7 @@ func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
 			"FinishedAt":   sess.FinishedAt,
 			"Status":       sess.Status,
 			"SeedURLs":     sess.SeedURLs,
-			"Config":       sess.Config,
+			"Config":       config.RedactSensitiveConfigJSON(sess.Config),
 			"PagesCrawled": pagesCrawled,
 			"UserAgent":    sess.UserAgent,
 			"ProjectID":    sess.ProjectID,
