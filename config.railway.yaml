@@ -1,0 +1,13 @@
+clickhouse:
+  host: clickhouse.railway.internal
+  port: 9000
+  database: crawlobserver
+  username: default
+  password: crawlobserver
+  mode: external
+
+server:
+  host: 0.0.0.0
+  port: 8899
+  username: admin
+  password: Cr4wl0bs-S1l3x!2026
