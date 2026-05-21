@@ -1,13 +1,24 @@
+# Railway runtime config.
+# Secrets MUST be provided as environment variables on the Railway service,
+# not committed here. Viper reads CRAWLOBSERVER_<SECTION>_<KEY> env vars and
+# overrides values from this file.
+#
+# Required on the crawlobserver service:
+#   CRAWLOBSERVER_SERVER_PASSWORD       — admin Basic Auth password
+#   CRAWLOBSERVER_CLICKHOUSE_PASSWORD   — password of the clickhouse service
+#
+# If either is missing, the app will start with an empty password (insecure).
+
 clickhouse:
   host: clickhouse.railway.internal
   port: 9000
   database: crawlobserver
   username: default
-  password: crawlobserver
+  password: ""
   mode: external
 
 server:
   host: 0.0.0.0
   port: 8899
   username: admin
-  password: Cr4wl0bs-S1l3x!2026
+  password: ""
