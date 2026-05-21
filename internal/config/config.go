@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,12 +14,12 @@ import (
 )
 
 type Config struct {
-	Crawler       CrawlerConfig    `mapstructure:"crawler"`
-	ClickHouse    ClickHouseConfig `mapstructure:"clickhouse"`
-	Storage       StorageConfig    `mapstructure:"storage"`
-	Resources     ResourcesConfig  `mapstructure:"resources"`
-	Server        ServerConfig     `mapstructure:"server"`
-	Theme         ThemeConfig      `mapstructure:"theme"`
+	Crawler       CrawlerConfig       `mapstructure:"crawler"`
+	ClickHouse    ClickHouseConfig    `mapstructure:"clickhouse"`
+	Storage       StorageConfig       `mapstructure:"storage"`
+	Resources     ResourcesConfig     `mapstructure:"resources"`
+	Server        ServerConfig        `mapstructure:"server"`
+	Theme         ThemeConfig         `mapstructure:"theme"`
 	GSC           GSCConfig           `mapstructure:"gsc"`
 	Interlinking  InterlinkingConfig  `mapstructure:"interlinking"`
 	Backup        BackupConfig        `mapstructure:"backup"`
@@ -46,24 +45,24 @@ type TelemetryConfig struct {
 }
 
 type CrawlerConfig struct {
-	Workers               int            `mapstructure:"workers"`
-	Delay                 time.Duration  `mapstructure:"delay"`
-	MaxPages              int            `mapstructure:"max_pages"`
-	MaxDepth              int            `mapstructure:"max_depth"`
-	Timeout               time.Duration  `mapstructure:"timeout"`
-	UserAgent             string         `mapstructure:"user_agent"`
-	MaxBodySize           int64          `mapstructure:"max_body_size"`
-	RespectRobots         bool           `mapstructure:"respect_robots"`
-	StoreHTML             bool           `mapstructure:"store_html"`
-	CrawlScope            string         `mapstructure:"crawl_scope"`             // "host" (default), "domain" (eTLD+1), or "subdirectory"
-	AllowPrivateIPs       bool           `mapstructure:"allow_private_ips"`       // allow crawling private/reserved IPs (default: false)
-	TLSProfile            string         `mapstructure:"tls_profile"`             // "", "chrome", "firefox", "edge"
-	SourceIP              string         `mapstructure:"source_ip"`               // local IP to bind outgoing connections
-	ForceIPv4             bool           `mapstructure:"force_ipv4"`              // force IPv4-only DNS and connections
-	MaxConcurrentSessions int            `mapstructure:"max_concurrent_sessions"` // 0 = 20
-	MaxFrontierSize       int            `mapstructure:"max_frontier_size"`       // 0 = 5_000_000
-	MaxWorkers            int            `mapstructure:"max_workers"`             // 0 = 100
-	ExcludePatterns       []string       `mapstructure:"exclude_patterns"`       // URL substrings to exclude from crawl (links still recorded)
+	Workers               int              `mapstructure:"workers"`
+	Delay                 time.Duration    `mapstructure:"delay"`
+	MaxPages              int              `mapstructure:"max_pages"`
+	MaxDepth              int              `mapstructure:"max_depth"`
+	Timeout               time.Duration    `mapstructure:"timeout"`
+	UserAgent             string           `mapstructure:"user_agent"`
+	MaxBodySize           int64            `mapstructure:"max_body_size"`
+	RespectRobots         bool             `mapstructure:"respect_robots"`
+	StoreHTML             bool             `mapstructure:"store_html"`
+	CrawlScope            string           `mapstructure:"crawl_scope"`             // "host" (default), "domain" (eTLD+1), or "subdirectory"
+	AllowPrivateIPs       bool             `mapstructure:"allow_private_ips"`       // allow crawling private/reserved IPs (default: false)
+	TLSProfile            string           `mapstructure:"tls_profile"`             // "", "chrome", "firefox", "edge"
+	SourceIP              string           `mapstructure:"source_ip"`               // local IP to bind outgoing connections
+	ForceIPv4             bool             `mapstructure:"force_ipv4"`              // force IPv4-only DNS and connections
+	MaxConcurrentSessions int              `mapstructure:"max_concurrent_sessions"` // 0 = 20
+	MaxFrontierSize       int              `mapstructure:"max_frontier_size"`       // 0 = 5_000_000
+	MaxWorkers            int              `mapstructure:"max_workers"`             // 0 = 100
+	ExcludePatterns       []string         `mapstructure:"exclude_patterns"`        // URL substrings to exclude from crawl (links still recorded)
 	Retry                 RetryConfig      `mapstructure:"retry"`
 	JSRender              JSRenderConfig   `mapstructure:"js_render"`
 	Cloudflare            CloudflareConfig `mapstructure:"cloudflare"`
@@ -78,9 +77,9 @@ type JSRenderConfig struct {
 
 type CloudflareConfig struct {
 	Enabled      bool          `mapstructure:"enabled"`
-	Resolver     string        `mapstructure:"resolver"`      // "none" (default) or "api"
-	APIURL       string        `mapstructure:"api_url"`       // external solver API endpoint
-	APIKey       string        `mapstructure:"api_key"`       // Bearer token for the API
+	Resolver     string        `mapstructure:"resolver"` // "none" (default) or "api"
+	APIURL       string        `mapstructure:"api_url"`  // external solver API endpoint
+	APIKey       string        `mapstructure:"api_key"`  // Bearer token for the API
 	SolveTimeout time.Duration `mapstructure:"solve_timeout"`
 	MaxHoldURLs  int           `mapstructure:"max_hold_urls"`
 }
@@ -96,7 +95,7 @@ type RetryConfig struct {
 type ClickHouseConfig struct {
 	Host       string `mapstructure:"host"`
 	Port       int    `mapstructure:"port"`
-	HTTPPort   int    `mapstructure:"http_port"`   // HTTP interface port for backups, 0 = port - 1000
+	HTTPPort   int    `mapstructure:"http_port"` // HTTP interface port for backups, 0 = port - 1000
 	Database   string `mapstructure:"database"`
 	Username   string `mapstructure:"username"`
 	Password   string `mapstructure:"password"`
@@ -459,68 +458,4 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("storage.flush_interval must be > 0")
 	}
 	return nil
-}
-
-// migrateLegacySQLite copies a legacy SQLite database to the new location if needed.
-// It checks the working directory and the directory containing the config file.
-// The copy only happens when the destination doesn't exist or is empty (0 bytes).
-func migrateLegacySQLite(destPath, baseName string) {
-	// Skip if destination already has data
-	if info, err := os.Stat(destPath); err == nil && info.Size() > 0 {
-		return
-	}
-
-	// Candidate locations where the old database might live
-	var candidates []string
-
-	// 1. Current working directory
-	if cwd, err := os.Getwd(); err == nil {
-		candidates = append(candidates, filepath.Join(cwd, baseName))
-	}
-
-	// 2. Next to the config file
-	if cfgFile := viper.ConfigFileUsed(); cfgFile != "" {
-		candidates = append(candidates, filepath.Join(filepath.Dir(cfgFile), baseName))
-	}
-
-	for _, src := range candidates {
-		// Don't copy onto itself
-		if src == destPath {
-			continue
-		}
-		info, err := os.Stat(src)
-		if err != nil || info.Size() == 0 {
-			continue
-		}
-		// Found a legacy database — copy it
-		if err := copyFile(src, destPath); err != nil {
-			fmt.Fprintf(os.Stderr, "  Warning: failed to migrate database from %s: %v\n", src, err)
-			continue
-		}
-		fmt.Fprintf(os.Stderr, "  Migrated database from %s to %s\n", src, destPath)
-		return
-	}
-}
-
-// copyFile copies src to dst, preserving permissions.
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	info, err := in.Stat()
-	if err != nil {
-		return err
-	}
-
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode())
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	return err
 }
