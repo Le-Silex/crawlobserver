@@ -24,4 +24,8 @@ COPY --from=builder /app/crawlobserver .
 COPY --from=builder /app/migrations ./migrations
 COPY --from=builder /app/config.railway.yaml ./config.yaml
 EXPOSE 8899
+# IMPORTANT: SQLite (projects, api_keys, rulesets, extractors...) lives in
+# /root/.local/share/crawlobserver. In any container-based deploy (Railway,
+# Fly, etc.), mount a persistent volume there or this data is lost on every
+# redeploy. See README for details.
 CMD ["./crawlobserver", "serve"]
