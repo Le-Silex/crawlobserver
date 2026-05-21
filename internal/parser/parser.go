@@ -109,20 +109,63 @@ func countWords(doc *goquery.Document) int {
 	return count
 }
 
+// lazyImgAttrs lists attributes commonly used for lazy-loaded image sources,
+// in priority order. Some are CDN-specific (TwicPics, ScrapingBee, etc.).
+var lazyImgAttrs = []string{
+	"src",
+	"data-src",
+	"data-lazy-src",
+	"data-original",
+	"data-original-src",
+	"data-image-src",
+	"data-twic-src",
+}
+
+// extractImgSrc returns the first non-empty image source from a list of known
+// attributes, falling back to the first URL in srcset/data-srcset.
+func extractImgSrc(s *goquery.Selection) string {
+	for _, attr := range lazyImgAttrs {
+		if v, ok := s.Attr(attr); ok {
+			if v = strings.TrimSpace(v); v != "" {
+				return v
+			}
+		}
+	}
+	for _, attr := range []string{"srcset", "data-srcset"} {
+		if v, ok := s.Attr(attr); ok {
+			if first := firstSrcsetURL(v); first != "" {
+				return first
+			}
+		}
+	}
+	return ""
+}
+
+// firstSrcsetURL extracts the first URL from a srcset attribute value.
+// srcset format: "url1 1x, url2 2x" or "url1 100w, url2 200w".
+func firstSrcsetURL(srcset string) string {
+	srcset = strings.TrimSpace(srcset)
+	if srcset == "" {
+		return ""
+	}
+	first := strings.SplitN(srcset, ",", 2)[0]
+	fields := strings.Fields(first)
+	if len(fields) == 0 {
+		return ""
+	}
+	return fields[0]
+}
+
 // extractImages extracts all images from the page.
 func extractImages(doc *goquery.Document, baseURL *url.URL) []Image {
 	var images []Image
 	doc.Find("img").Each(func(_ int, s *goquery.Selection) {
-		src, _ := s.Attr("src")
-		if src == "" {
-			src, _ = s.Attr("data-src") // lazy loading
-		}
+		src := extractImgSrc(s)
 		alt, _ := s.Attr("alt")
 		width, _ := s.Attr("width")
 		height, _ := s.Attr("height")
 
 		if src != "" {
-			// Resolve relative URLs
 			if resolved, err := baseURL.Parse(src); err == nil {
 				src = resolved.String()
 			}

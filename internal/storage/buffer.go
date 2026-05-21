@@ -15,6 +15,7 @@ import (
 type PageLinkInserter interface {
 	InsertPages(ctx context.Context, pages []PageRow) error
 	InsertLinks(ctx context.Context, links []LinkRow) error
+	InsertImages(ctx context.Context, images []ImageRow) error
 	InsertExtractions(ctx context.Context, rows []extraction.ExtractionRow) error
 	InsertStructuredData(ctx context.Context, items []schema.StructuredDataItem) error
 }
@@ -44,10 +45,12 @@ type Buffer struct {
 	mu              sync.Mutex
 	pages           []PageRow
 	links           []LinkRow
+	images          []ImageRow
 	extractions     []extraction.ExtractionRow
 	structuredData       []schema.StructuredDataItem
 	failedPages          []retryBatch[PageRow]
 	failedLinks          []retryBatch[LinkRow]
+	failedImages         []retryBatch[ImageRow]
 	failedStructuredData []retryBatch[schema.StructuredDataItem]
 	lostPages   int64
 	lostLinks   int64
@@ -102,6 +105,21 @@ func (b *Buffer) AddLinks(links []LinkRow) {
 	}
 }
 
+// AddImages adds image rows to the buffer.
+func (b *Buffer) AddImages(images []ImageRow) {
+	if len(images) == 0 {
+		return
+	}
+	b.mu.Lock()
+	b.images = append(b.images, images...)
+	shouldFlush := len(b.images) >= b.batchSize
+	b.mu.Unlock()
+
+	if shouldFlush {
+		b.Flush()
+	}
+}
+
 // AddExtractions adds extraction rows to the buffer.
 func (b *Buffer) AddExtractions(rows []extraction.ExtractionRow) {
 	if len(rows) == 0 {
@@ -144,19 +162,23 @@ func (b *Buffer) Flush() {
 	b.mu.Lock()
 	pages := b.pages
 	links := b.links
+	images := b.images
 	extractions := b.extractions
 	structuredData := b.structuredData
 	b.pages = nil
 	b.links = nil
+	b.images = nil
 	b.extractions = nil
 	b.structuredData = nil
 
 	// Grab failed batches to retry
 	failedPages := b.failedPages
 	failedLinks := b.failedLinks
+	failedImages := b.failedImages
 	failedSD := b.failedStructuredData
 	b.failedPages = nil
 	b.failedLinks = nil
+	b.failedImages = nil
 	b.failedStructuredData = nil
 	b.mu.Unlock()
 
@@ -201,6 +223,24 @@ func (b *Buffer) Flush() {
 			} else {
 				b.mu.Lock()
 				b.failedLinks = append(b.failedLinks, batch)
+				b.lastError = err
+				b.mu.Unlock()
+			}
+		}
+	}
+
+	// Retry previously failed image batches
+	for _, batch := range failedImages {
+		if err := b.store.InsertImages(ctx, batch.data); err != nil {
+			batch.retries++
+			if batch.retries >= b.maxRetries {
+				applog.Errorf("storage", "[%s] dropping %d images after %d retries: %v", b.sessionID, len(batch.data), batch.retries, err)
+				b.mu.Lock()
+				b.lastError = err
+				b.mu.Unlock()
+			} else {
+				b.mu.Lock()
+				b.failedImages = append(b.failedImages, batch)
 				b.lastError = err
 				b.mu.Unlock()
 			}
@@ -252,6 +292,17 @@ func (b *Buffer) Flush() {
 			applog.Errorf("storage", "[%s] flushing %d links (will retry): %v", b.sessionID, len(links), err)
 			b.mu.Lock()
 			b.failedLinks = append(b.failedLinks, retryBatch[LinkRow]{data: links, retries: 0})
+			b.lastError = err
+			b.mu.Unlock()
+		}
+	}
+
+	// Flush current images
+	if len(images) > 0 {
+		if err := b.store.InsertImages(ctx, images); err != nil {
+			applog.Errorf("storage", "[%s] flushing %d images (will retry): %v", b.sessionID, len(images), err)
+			b.mu.Lock()
+			b.failedImages = append(b.failedImages, retryBatch[ImageRow]{data: images, retries: 0})
 			b.lastError = err
 			b.mu.Unlock()
 		}

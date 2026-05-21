@@ -930,12 +930,35 @@ func (e *Engine) parseWorker(id int, in <-chan *fetcher.FetchResult) {
 				// Images
 				pageRow.ImagesCount = uint16(len(pageData.Images))
 				noAlt := 0
+				var imageRows []storage.ImageRow
 				for _, img := range pageData.Images {
-					if img.Alt == "" {
+					hasAlt := img.Alt != ""
+					if !hasAlt {
 						noAlt++
 					}
+					if img.Src == "" {
+						continue
+					}
+					imageRows = append(imageRows, storage.ImageRow{
+						CrawlSessionID: e.session.ID,
+						PageURL:        pageRow.URL,
+						ImageSrc:       img.Src,
+						Alt:            img.Alt,
+						HasAlt:         hasAlt,
+						Width:          img.Width,
+						Height:         img.Height,
+						CrawledAt:      now,
+					})
 				}
 				pageRow.ImagesNoAlt = uint16(noAlt)
+				if len(imageRows) > 0 {
+					e.bufferMu.RLock()
+					buf := e.buffer
+					e.bufferMu.RUnlock()
+					if buf != nil {
+						buf.AddImages(imageRows)
+					}
+				}
 
 				// Hreflang
 				for _, h := range pageData.Hreflang {

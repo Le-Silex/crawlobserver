@@ -136,6 +136,10 @@ func (d *diskFullInserter) InsertLinks(_ context.Context, _ []storage.LinkRow) e
 	return fmt.Errorf("code: 243, Cannot reserve 1073741824 bytes in file")
 }
 
+func (d *diskFullInserter) InsertImages(_ context.Context, _ []storage.ImageRow) error {
+	return fmt.Errorf("code: 243, Cannot reserve 1073741824 bytes in file")
+}
+
 func (d *diskFullInserter) InsertExtractions(_ context.Context, _ []extraction.ExtractionRow) error {
 	return fmt.Errorf("code: 243, Cannot reserve 1073741824 bytes in file")
 }
@@ -446,6 +450,7 @@ type successInserter struct{}
 
 func (s *successInserter) InsertPages(_ context.Context, _ []storage.PageRow) error { return nil }
 func (s *successInserter) InsertLinks(_ context.Context, _ []storage.LinkRow) error { return nil }
+func (s *successInserter) InsertImages(_ context.Context, _ []storage.ImageRow) error { return nil }
 func (s *successInserter) InsertExtractions(_ context.Context, _ []extraction.ExtractionRow) error {
 	return nil
 }
@@ -473,6 +478,10 @@ func (i *e2eInserter) InsertLinks(_ context.Context, links []storage.LinkRow) er
 	i.mu.Lock()
 	i.links = append(i.links, links...)
 	i.mu.Unlock()
+	return nil
+}
+
+func (i *e2eInserter) InsertImages(_ context.Context, _ []storage.ImageRow) error {
 	return nil
 }
 

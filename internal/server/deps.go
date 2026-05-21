@@ -42,6 +42,8 @@ type PageStore interface {
 type LinkStore interface {
 	ExternalLinksPaginated(ctx context.Context, sessionID string, limit, offset int, filters []storage.ParsedFilter, sort *storage.SortParam) ([]storage.LinkRow, error)
 	InternalLinksPaginated(ctx context.Context, sessionID string, limit, offset int, filters []storage.ParsedFilter, sort *storage.SortParam) ([]storage.LinkRow, error)
+	ListImages(ctx context.Context, sessionID string, limit, offset int, filters []storage.ParsedFilter, sort *storage.SortParam) ([]storage.ImageRow, error)
+	ListImagesAggregated(ctx context.Context, sessionID string, limit, offset int, filters []storage.ParsedFilter, sort *storage.SortParam) ([]storage.ImageAggregateRow, error)
 	GetExternalLinkChecks(ctx context.Context, sessionID string, limit, offset int, filters []storage.ParsedFilter, sort *storage.SortParam) ([]storage.ExternalLinkCheckWithSource, error)
 	GetExternalLinkCheckDomains(ctx context.Context, sessionID string, limit, offset int, filters []storage.ParsedFilter, havingFilters []storage.ParsedFilter, sort *storage.SortParam) ([]storage.ExternalDomainCheck, error)
 	GetExpiredDomains(ctx context.Context, sessionID string, limit, offset int, nsOnly bool) (*storage.ExpiredDomainsResult, error)

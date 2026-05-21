@@ -234,6 +234,33 @@ var LinkSortColumns = map[string]string{
 	"crawled_at":  "crawled_at",
 }
 
+// ImageFilters defines the allowed filter columns for the images table.
+var ImageFilters = map[string]FilterDef{
+	"page_url":  {Column: "page_url", Type: FilterLike},
+	"image_src": {Column: "image_src", Type: FilterLike},
+	"alt":       {Column: "alt", Type: FilterLike},
+	"has_alt":   {Column: "has_alt", Type: FilterBool},
+	"width":     {Column: "width", Type: FilterLike},
+	"height":    {Column: "height", Type: FilterLike},
+}
+
+// ImageSortColumns maps query param names to DB column names for images.
+var ImageSortColumns = map[string]string{
+	"page_url":   "page_url",
+	"image_src":  "image_src",
+	"alt":        "alt",
+	"has_alt":    "has_alt",
+	"crawled_at": "crawled_at",
+}
+
+// ImageAggregateSortColumns maps query param names to expressions for the
+// grouped-by-image_src view (see ListImagesAggregated).
+var ImageAggregateSortColumns = map[string]string{
+	"image_src":    "image_src",
+	"usage_count":  "usage_count",
+	"no_alt_count": "no_alt_count",
+}
+
 // HreflangIssueFilters defines the allowed filter columns for hreflang_issues.
 var HreflangIssueFilters = map[string]FilterDef{
 	"source_url": {Column: "source_url", Type: FilterLike},

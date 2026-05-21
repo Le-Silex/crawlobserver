@@ -19,6 +19,7 @@ export const TAB_FILTERS = {
   meta: ['url', 'meta_description', 'meta_desc_length', 'meta_keywords', 'og_title'],
   headings: ['url', 'h1', 'h2'],
   images: ['url', 'images_count', 'images_no_alt', 'title', 'word_count'],
+  'image-list': ['image_src', '', '', '', 'page_url'],
   indexability: [
     'url',
     'is_indexable',

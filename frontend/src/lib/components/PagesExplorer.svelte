@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { getPages, getRedirectPages, buildApiPath } from '../api.js';
+  import { getPages, getRedirectPages, getImages, buildApiPath } from '../api.js';
   import { statusBadge, fmt, fmtSize, fmtN, trunc, fetchAll, downloadCSV } from '../utils.js';
   import { PAGE_SIZE, TAB_FILTERS } from '../tabColumns.js';
   import { t } from '../i18n/index.svelte.js';
@@ -28,6 +28,7 @@
     { id: 'meta', label: () => t('pages.meta') },
     { id: 'headings', label: () => t('pages.headings') },
     { id: 'images', label: () => t('pages.images') },
+    { id: 'image-list', label: () => t('pages.imageList') },
     { id: 'indexability', label: () => t('pages.indexability') },
     { id: 'response', label: () => t('pages.response') },
     { id: 'redirects', label: () => t('pages.redirects') },
@@ -63,6 +64,9 @@
   let redirectPages = $state([]);
   let redirectPagesOffset = $state(0);
   let hasMoreRedirectPages = $state(false);
+  let imageRows = $state([]);
+  let imageRowsOffset = $state(0);
+  let hasMoreImageRows = $state(false);
 
   function basePath() {
     return `/sessions/${sessionId}/pages`;
@@ -98,6 +102,17 @@
         );
         redirectPages = result || [];
         hasMoreRedirectPages = redirectPages.length === PAGE_SIZE;
+      } else if (subView === 'image-list') {
+        const result = await getImages(
+          sessionId,
+          PAGE_SIZE,
+          imageRowsOffset,
+          filters,
+          sortColumn,
+          sortOrder,
+        );
+        imageRows = result || [];
+        hasMoreImageRows = imageRows.length === PAGE_SIZE;
       } else {
         const result = await getPages(
           sessionId,
@@ -120,6 +135,7 @@
     filters = {};
     pagesOffset = 0;
     redirectPagesOffset = 0;
+    imageRowsOffset = 0;
     sortColumn = '';
     sortOrder = '';
     pushFilters(sv, {}, 0);
@@ -139,6 +155,9 @@
     if (subView === 'redirects') {
       redirectPagesOffset += PAGE_SIZE;
       pushFilters(null, null, redirectPagesOffset);
+    } else if (subView === 'image-list') {
+      imageRowsOffset += PAGE_SIZE;
+      pushFilters(null, null, imageRowsOffset);
     } else {
       pagesOffset += PAGE_SIZE;
       pushFilters(null, null, pagesOffset);
@@ -150,6 +169,9 @@
     if (subView === 'redirects') {
       redirectPagesOffset = Math.max(0, redirectPagesOffset - PAGE_SIZE);
       pushFilters(null, null, redirectPagesOffset);
+    } else if (subView === 'image-list') {
+      imageRowsOffset = Math.max(0, imageRowsOffset - PAGE_SIZE);
+      pushFilters(null, null, imageRowsOffset);
     } else {
       pagesOffset = Math.max(0, pagesOffset - PAGE_SIZE);
       pushFilters(null, null, pagesOffset);
@@ -251,6 +273,10 @@
       headers: ['URL', 'Status', 'Final URL', 'Inbound Internal Links'],
       keys: ['url', 'status_code', 'final_url', 'inbound_internal_links'],
     },
+    'image-list': {
+      headers: ['Image URL', 'Usage Count', 'No-Alt Count', 'Sample Alt', 'Sample Page URL'],
+      keys: ['ImageSrc', 'UsageCount', 'NoAltCount', 'SampleAlt', 'SamplePageURL'],
+    },
   };
 
   let exporting = $state(false);
@@ -271,7 +297,9 @@
     const fetcher =
       subView === 'redirects'
         ? (limit, offset) => getRedirectPages(sessionId, limit, offset, filters)
-        : (limit, offset) => getPages(sessionId, limit, offset, effectiveFilters());
+        : subView === 'image-list'
+          ? (limit, offset) => getImages(sessionId, limit, offset, filters)
+          : (limit, offset) => getPages(sessionId, limit, offset, effectiveFilters());
     const allData = await fetchAll(fetcher);
     const keys = cfg.customKeys || cfg.keys;
     let rows = allData;
@@ -295,11 +323,12 @@
   }
 
   let apiPath = $derived.by(() => {
-    const endpoint =
-      subView === 'redirects'
-        ? `/sessions/${sessionId}/redirect-pages`
-        : `/sessions/${sessionId}/pages`;
-    const activeF = subView === 'redirects' ? filters : effectiveFilters();
+    let endpoint;
+    if (subView === 'redirects') endpoint = `/sessions/${sessionId}/redirect-pages`;
+    else if (subView === 'image-list') endpoint = `/sessions/${sessionId}/images`;
+    else endpoint = `/sessions/${sessionId}/pages`;
+    const activeF =
+      subView === 'redirects' || subView === 'image-list' ? filters : effectiveFilters();
     return buildApiPath(endpoint, {
       limit: PAGE_SIZE,
       offset: 0,
@@ -563,6 +592,54 @@
           <td class:cell-warn={p.ImagesNoAlt > 0}>{p.ImagesNoAlt}</td>
           <td class="cell-title">{trunc(p.Title, 50)}</td>
           <td>{fmtN(p.WordCount)}</td>
+        </tr>
+      {/snippet}
+    </DataTable>
+  {:else if subView === 'image-list'}
+    <DataTable
+      columns={[
+        { label: t('pages.imageSrc'), sortKey: 'image_src' },
+        { label: t('pages.usageCount'), sortKey: 'usage_count' },
+        { label: t('pages.noAltCount'), sortKey: 'no_alt_count' },
+        { label: t('pages.sampleAlt') },
+        { label: t('pages.samplePageUrl') },
+      ]}
+      filterKeys={TAB_FILTERS['image-list']}
+      {filters}
+      data={imageRows}
+      offset={imageRowsOffset}
+      pageSize={PAGE_SIZE}
+      hasMore={hasMoreImageRows}
+      hasActiveFilters={hasActiveFilters()}
+      onsetfilter={setFilter}
+      onapplyfilters={applyFilters}
+      onclearfilters={clearFilters}
+      onnextpage={nextPage}
+      onprevpage={prevPage}
+      {sortColumn}
+      {sortOrder}
+      onsort={handleSort}
+    >
+      {#snippet row(img)}
+        <tr>
+          <td class="cell-url"
+            ><span class="cell-url-inner"
+              ><a href={img.ImageSrc} target="_blank" rel="noopener noreferrer"
+                >{trunc(img.ImageSrc, 80)}</a
+              ><UrlActions url={img.ImageSrc} /></span
+            ></td
+          >
+          <td>{fmtN(img.UsageCount)}</td>
+          <td class:cell-warn={img.NoAltCount > 0}>{fmtN(img.NoAltCount)}</td>
+          <td class="cell-title">{trunc(img.SampleAlt, 60)}</td>
+          <td class="cell-url"
+            ><span class="cell-url-inner"
+              ><a
+                href={urlDetailHref(img.SamplePageURL)}
+                onclick={(e) => goToUrlDetail(e, img.SamplePageURL)}>{trunc(img.SamplePageURL, 60)}</a
+              ><UrlActions url={img.SamplePageURL} /></span
+            ></td
+          >
         </tr>
       {/snippet}
     </DataTable>

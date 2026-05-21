@@ -38,6 +38,9 @@ func (m *mockInserter) InsertPages(ctx context.Context, pages []PageRow) error {
 	return nil
 }
 
+func (m *mockInserter) InsertImages(ctx context.Context, images []ImageRow) error {
+	return nil
+}
 func (m *mockInserter) InsertExtractions(ctx context.Context, rows []extraction.ExtractionRow) error {
 	return nil
 }

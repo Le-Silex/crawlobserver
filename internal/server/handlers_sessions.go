@@ -244,6 +244,23 @@ func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, audit)
 }
 
+func (s *Server) handleImages(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	if !s.requireSessionAccess(w, r, sessionID) {
+		return
+	}
+	limit, offset := clampPagination(queryInt(r, "limit", 100), queryInt(r, "offset", 0))
+	filters := parseFilters(r, storage.ImageFilters)
+	sort := parseSort(r, storage.ImageAggregateSortColumns)
+
+	images, err := s.store.ListImagesAggregated(r.Context(), sessionID, limit, offset, filters, sort)
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+	writeJSON(w, images)
+}
+
 func (s *Server) handleInternalLinks(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.PathValue("id")
 	if !s.requireSessionAccess(w, r, sessionID) {

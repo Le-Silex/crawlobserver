@@ -781,6 +781,7 @@ var Migrations = []Migration{
 	{Name: "alter pages v7 structured data", DDL: AlterPagesV7StructuredData},
 	{Name: "alter pages v8 cwv", DDL: AlterPagesV8CWV},
 	{Name: "create hreflang_issues", DDL: CreateHreflangIssues},
+	{Name: "create images", DDL: CreateImages},
 }
 
 const AlterSessionsV3 = `
@@ -838,4 +839,19 @@ CREATE TABLE IF NOT EXISTS crawlobserver.hreflang_issues (
 ) ENGINE = ReplacingMergeTree(computed_at)
 PARTITION BY crawl_session_id
 ORDER BY (crawl_session_id, issue_type, source_url, target_url)
+`
+
+const CreateImages = `
+CREATE TABLE IF NOT EXISTS crawlobserver.images (
+    crawl_session_id UUID,
+    page_url String,
+    image_src String,
+    alt String,
+    has_alt Bool,
+    width String,
+    height String,
+    crawled_at DateTime64(3)
+) ENGINE = ReplacingMergeTree(crawled_at)
+PARTITION BY crawl_session_id
+ORDER BY (crawl_session_id, page_url, image_src)
 `

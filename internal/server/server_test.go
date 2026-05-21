@@ -150,6 +150,14 @@ func (m *mockStore) InternalLinksPaginated(_ context.Context, _ string, _, _ int
 	return m.links, m.err
 }
 
+func (m *mockStore) ListImages(_ context.Context, _ string, _, _ int, _ []storage.ParsedFilter, _ *storage.SortParam) ([]storage.ImageRow, error) {
+	return nil, m.err
+}
+
+func (m *mockStore) ListImagesAggregated(_ context.Context, _ string, _, _ int, _ []storage.ParsedFilter, _ *storage.SortParam) ([]storage.ImageAggregateRow, error) {
+	return nil, m.err
+}
+
 func (m *mockStore) SessionStats(_ context.Context, _ string) (*storage.SessionStats, error) {
 	return m.stats, m.err
 }

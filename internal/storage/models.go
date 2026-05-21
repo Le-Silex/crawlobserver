@@ -148,6 +148,28 @@ type SitemapURLRow struct {
 	Priority       string
 }
 
+// ImageRow represents an image found on a page for storage.
+type ImageRow struct {
+	CrawlSessionID string
+	PageURL        string
+	ImageSrc       string
+	Alt            string
+	HasAlt         bool
+	Width          string
+	Height         string
+	CrawledAt      time.Time
+}
+
+// ImageAggregateRow represents a unique image grouped across pages,
+// with usage counts and sample fields for context.
+type ImageAggregateRow struct {
+	ImageSrc      string
+	UsageCount    uint64
+	NoAltCount    uint64
+	SampleAlt     string
+	SamplePageURL string
+}
+
 // LinkRow represents a link for storage.
 type LinkRow struct {
 	CrawlSessionID string

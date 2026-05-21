@@ -162,6 +162,7 @@ func (s *Server) buildHandler() (http.Handler, error) {
 	mux.HandleFunc("GET /api/sessions/{id}/pages", s.handlePages)
 	mux.HandleFunc("GET /api/sessions/{id}/links", s.handleLinks)
 	mux.HandleFunc("GET /api/sessions/{id}/internal-links", s.handleInternalLinks)
+	mux.HandleFunc("GET /api/sessions/{id}/images", s.handleImages)
 	mux.HandleFunc("GET /api/sessions/{id}/stats", s.handleStats)
 	mux.HandleFunc("GET /api/sessions/{id}/audit", s.handleAudit)
 	mux.HandleFunc("GET /api/sessions/{id}/progress", s.handleProgress)
